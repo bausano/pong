@@ -10,6 +10,4 @@ The projector projects the game on a table. There is a camera next to the projec
 
 ## Installation
 
-Install Alsa project with `apt-get install libasound2 alsa-utils alsa-oss`.
-
-Install `ggez` dependencies with `sudo apt-get install -y libasound2-dev libudev-dev`.
+Install `ggez` dependencies with `sudo apt-get install libasound2 alsa-utils also-oss libasound2-dev libudev-dev`.
