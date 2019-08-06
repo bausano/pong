@@ -1,6 +1,7 @@
 use super::ball::Ball;
 use super::camera::Camera;
 use super::phase::Phase;
+use super::SCREEN_SIZE;
 use ggez::event::EventHandler;
 use ggez::{graphics, Context, GameResult};
 
@@ -30,7 +31,14 @@ impl Pong {
 impl EventHandler for Pong {
     /// Update the game state or transition into a new phase.
     fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
-        println!("Update");
+        if let Some(player) = self.ball.player_scored() {
+            println!("Player {} scored.", player);
+
+            self.ball = Default::default();
+        }
+
+        // Tries to bounce the ball from a wall.
+        self.ball.bounce_from_wall();
 
         Ok(())
     }
@@ -39,11 +47,23 @@ impl EventHandler for Pong {
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, graphics::WHITE);
 
-        let rect = graphics::Rect::new(450.0, 450.0, 50.0, 50.0);
-        let r1 =
-            graphics::Mesh::new_rectangle(ctx, graphics::DrawMode::fill(), rect, graphics::WHITE)?;
+        // TODO: Handle mutex error.
+        // TODO: Draw the paddle once and the just update its position.
+        for (center_x, center_y) in (*self.camera.positions.lock().unwrap()).iter() {
+            // TODO: Make paddle size editable.
+            let paddle_x = (center_x - 50.0).min(SCREEN_SIZE.0 - 100.0).max(50.0);
+            let paddle_y = (center_y - 10.0).min(SCREEN_SIZE.1 - 20.0).max(10.0);
 
-        graphics::draw(ctx, &r1, graphics::DrawParam::default())?;
+            let paddle_shape = graphics::Rect::new(paddle_x, paddle_y, 100.0, 20.0);
+            let paddle = graphics::Mesh::new_rectangle(
+                ctx,
+                graphics::DrawMode::fill(),
+                paddle_shape,
+                graphics::BLACK,
+            )?;
+
+            graphics::draw(ctx, &paddle, graphics::DrawParam::default())?;
+        }
 
         graphics::present(ctx)
     }

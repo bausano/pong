@@ -12,7 +12,7 @@ pub struct Camera {
     controllers: [Vec<(u8, u8, u8)>; 2],
 
     /// Latest position of each player. This value is updated by the camera.
-    positions: Arc<Mutex<[(u32, u32); 2]>>,
+    pub positions: Arc<Mutex<[(f32, f32); 2]>>,
 }
 
 impl Camera {
@@ -21,7 +21,7 @@ impl Camera {
         Camera {
             controller_size: 0,
             controllers: [Vec::new(), Vec::new()],
-            positions: Arc::new(Mutex::new([(0, 0), (0, 0)])),
+            positions: Arc::new(Mutex::new([(200.0, 10.0), (300.0, 300.0)])),
         }
     }
 }
