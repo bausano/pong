@@ -3,7 +3,10 @@ use super::camera::Camera;
 use super::phase::Phase;
 use super::SCREEN_SIZE;
 use ggez::event::EventHandler;
+use ggez::graphics::Drawable;
+use ggez::nalgebra::Point2;
 use ggez::{graphics, Context, GameResult};
+use rand::rngs::ThreadRng;
 
 /// Game state that glues all parts of the game together.
 pub struct Pong {
@@ -15,6 +18,9 @@ pub struct Pong {
 
     /// First float represents balls x coordinate, second float balls
     ball: Ball,
+
+    /// Thread for rand create to generate random numbers.
+    rand: ThreadRng,
 }
 
 impl Pong {
@@ -24,6 +30,7 @@ impl Pong {
             camera: Camera::new(),
             ball: Default::default(),
             phase: Phase::ReadsController,
+            rand: ThreadRng::default(),
         }
     }
 }
@@ -37,8 +44,11 @@ impl EventHandler for Pong {
             self.ball = Default::default();
         }
 
-        // Tries to bounce the ball from a wall.
-        self.ball.bounce_from_wall();
+        // Tries to bounce the ball from a wall if it's close enough.
+        self.ball.bounce_from_wall(&mut self.rand);
+
+        // Moves the ball.
+        self.ball.tick();
 
         Ok(())
     }
@@ -46,6 +56,8 @@ impl EventHandler for Pong {
     /// Redraws the GUI.
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, graphics::WHITE);
+
+        self.ball.draw(ctx, graphics::DrawParam::default())?;
 
         // TODO: Handle mutex error.
         // TODO: Draw the paddle once and the just update its position.

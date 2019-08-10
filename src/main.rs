@@ -1,4 +1,5 @@
 extern crate ggez;
+extern crate rand;
 
 mod ball;
 mod camera;
