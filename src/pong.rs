@@ -1,7 +1,7 @@
 use super::ball::Ball;
 use super::camera::Camera;
+use super::paddle::Paddle;
 use super::phase::Phase;
-use super::SCREEN_SIZE;
 use ggez::event::EventHandler;
 use ggez::graphics::Drawable;
 use ggez::nalgebra::Point2;
@@ -10,6 +10,9 @@ use rand::rngs::ThreadRng;
 
 /// Game state that glues all parts of the game together.
 pub struct Pong {
+    /// Player's paddles.
+    paddles: [Paddle; 2],
+
     /// Which phase is the game currently in. This is useful for view switching.
     phase: Phase,
 
@@ -26,8 +29,14 @@ pub struct Pong {
 impl Pong {
     /// Creates a new state object.
     pub fn new(_: &mut Context) -> Self {
+        let camera = Camera::new();
+
         Pong {
-            camera: Camera::new(),
+            paddles: [
+                Paddle::new(0, camera.positions[0].clone()),
+                Paddle::new(1, camera.positions[1].clone()),
+            ],
+            camera,
             ball: Default::default(),
             phase: Phase::ReadsController,
             rand: ThreadRng::default(),
@@ -58,24 +67,8 @@ impl EventHandler for Pong {
         graphics::clear(ctx, graphics::WHITE);
 
         self.ball.draw(ctx, graphics::DrawParam::default())?;
-
-        // TODO: Handle mutex error.
-        // TODO: Draw the paddle once and the just update its position.
-        for (center_x, center_y) in (*self.camera.positions.lock().unwrap()).iter() {
-            // TODO: Make paddle size editable.
-            let paddle_x = (center_x - 50.0).min(SCREEN_SIZE.0 - 100.0).max(50.0);
-            let paddle_y = (center_y - 10.0).min(SCREEN_SIZE.1 - 20.0).max(10.0);
-
-            let paddle_shape = graphics::Rect::new(paddle_x, paddle_y, 100.0, 20.0);
-            let paddle = graphics::Mesh::new_rectangle(
-                ctx,
-                graphics::DrawMode::fill(),
-                paddle_shape,
-                graphics::BLACK,
-            )?;
-
-            graphics::draw(ctx, &paddle, graphics::DrawParam::default())?;
-        }
+        self.paddles[0].draw(ctx, graphics::DrawParam::default())?;
+        self.paddles[1].draw(ctx, graphics::DrawParam::default())?;
 
         graphics::present(ctx)
     }

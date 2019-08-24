@@ -1,3 +1,4 @@
+use super::SCREEN_SIZE;
 use std::sync::{Arc, Mutex};
 
 /// Object used for scanning the camera input. It is updated with relevant values such as
@@ -12,7 +13,7 @@ pub struct Camera {
     controllers: [Vec<(u8, u8, u8)>; 2],
 
     /// Latest position of each player. This value is updated by the camera.
-    pub positions: Arc<Mutex<[(f32, f32); 2]>>,
+    pub positions: [Arc<Mutex<f32>>; 2],
 }
 
 impl Camera {
@@ -21,7 +22,10 @@ impl Camera {
         Camera {
             controller_size: 0,
             controllers: [Vec::new(), Vec::new()],
-            positions: Arc::new(Mutex::new([(200.0, 10.0), (300.0, 300.0)])),
+            positions: [
+                Arc::new(Mutex::new(SCREEN_SIZE.1 / 2.0)),
+                Arc::new(Mutex::new(SCREEN_SIZE.1 / 2.0)),
+            ],
         }
     }
 }

@@ -95,11 +95,11 @@ impl Ball {
     /// ```
     ///
     pub fn player_scored(&mut self) -> Option<u8> {
-        if self.center.1 + self.radius >= SCREEN_SIZE.1 {
+        if self.center.1 >= SCREEN_SIZE.1 {
             return Some(0);
         }
 
-        if self.center.1 - self.radius <= 0.0 {
+        if self.center.1 <= 0.0 {
             return Some(1);
         }
 

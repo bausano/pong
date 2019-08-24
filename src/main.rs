@@ -3,6 +3,7 @@ extern crate rand;
 
 mod ball;
 mod camera;
+mod paddle;
 mod phase;
 mod pong;
 
