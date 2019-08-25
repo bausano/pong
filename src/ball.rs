@@ -1,3 +1,4 @@
+use super::paddle::Paddle;
 use super::SCREEN_SIZE;
 use ggez::graphics::{
     draw, BlendMode, Color, DrawMode, DrawParam, Drawable, MeshBuilder, Rect, BLACK,
@@ -11,6 +12,7 @@ pub const INCREMENT_FACTOR: f32 = 1.0 / 500.0;
 pub const DECREMENT_FACTOR: f32 = 1.0 / 500.0;
 pub const RANDOM_BOUNCE_BOUND: f32 = 0.1;
 pub const WALL_ACCELERATION_BONUS: f32 = 1.75;
+pub const PADDLE_ACCELERATION_BONUS: f32 = 2.0;
 pub const MAX_ACCELERATION: f32 = 3.0;
 pub const MIN_ACCELERATION: f32 = -5.0;
 pub const MAX_VELOCITY: f32 = 8.0;
@@ -124,6 +126,34 @@ impl Ball {
         }
     }
 
+    pub fn bounce_from_paddle(&mut self, paddle: &Paddle, rng: &mut ThreadRng) {
+        let (left_x, top_y) = paddle.position();
+        let right_x = left_x + paddle.width;
+        let bottom_y = top_y + paddle.height;
+
+        if self.contains(left_x, top_y)
+            || self.contains(right_x, top_y)
+            || self.contains(left_x, bottom_y)
+            || self.contains(right_x, bottom_y)
+        {
+            return self.bounce((-1.0, -1.0), PADDLE_ACCELERATION_BONUS, rng);
+        }
+
+        // If the paddle is player one's, but the ball is above the paddle, return,
+        if paddle.player_id == 0 && self.center.1 - self.radius > bottom_y {
+            return;
+        }
+
+        // If the paddle is player two's, but the ball is below the paddle, return.
+        if paddle.player_id == 1 && self.center.1 + self.radius < top_y {
+            return;
+        }
+
+        if self.center.0 + self.radius >= left_x && self.center.0 - self.radius <= right_x {
+            return self.bounce((1.0, -1.0), PADDLE_ACCELERATION_BONUS, rng);
+        }
+    }
+
     /// Applies transformation to ball's direction vector. The new direction vector is always
     /// in interval <-1; 1> for both x and y.
     pub fn bounce(&mut self, (x, y): (f32, f32), accelerate: f32, rng: &mut ThreadRng) {
@@ -146,6 +176,11 @@ impl Ball {
         // Normalizes the vector into <-1; 1> interval.
         self.direction.0 = new_x / max;
         self.direction.1 = new_y / max;
+    }
+
+    /// Whether the ball contains given point.
+    pub fn contains(&self, x: f32, y: f32) -> bool {
+        (x - self.center.0).powi(2) + (y - self.center.1).powi(2) <= self.radius.powi(2)
     }
 }
 

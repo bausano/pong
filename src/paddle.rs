@@ -48,7 +48,7 @@ impl Paddle {
             ((*self.x.lock().unwrap()) - self.width / 2.0)
                 .min(SCREEN_SIZE.0 - self.width)
                 .max(0.0),
-            self.player_id as f32 * (SCREEN_SIZE.1 - self.height / 2.0),
+            self.player_id as f32 * (SCREEN_SIZE.1 - self.height),
         )
     }
 }

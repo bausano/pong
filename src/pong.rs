@@ -56,6 +56,12 @@ impl EventHandler for Pong {
         // Tries to bounce the ball from a wall if it's close enough.
         self.ball.bounce_from_wall(&mut self.rand);
 
+        self.ball
+            .bounce_from_paddle(&self.paddles[0], &mut self.rand);
+
+        self.ball
+            .bounce_from_paddle(&self.paddles[1], &mut self.rand);
+
         // Moves the ball.
         self.ball.tick();
 
