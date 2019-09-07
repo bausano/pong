@@ -1,7 +1,7 @@
 use super::ball::Ball;
 use super::camera::Camera;
 use super::paddle::Paddle;
-use super::phase::Phase;
+use super::phases::{maps_playfield, plays_pong, reads_controllers, Phase};
 use ggez::event::EventHandler;
 use ggez::graphics::Drawable;
 use ggez::nalgebra::Point2;
@@ -11,19 +11,19 @@ use rand::rngs::ThreadRng;
 /// Game state that glues all parts of the game together.
 pub struct Pong {
     /// Player's paddles.
-    paddles: [Paddle; 2],
+    pub paddles: [Paddle; 2],
 
     /// Which phase is the game currently in. This is useful for view switching.
-    phase: Phase,
+    pub phase: Phase,
 
     /// Input interface.
-    camera: Camera,
+    pub camera: Camera,
 
     /// First float represents balls x coordinate, second float balls
-    ball: Ball,
+    pub ball: Ball,
 
     /// Thread for rand create to generate random numbers.
-    rand: ThreadRng,
+    pub rand: ThreadRng,
 }
 
 impl Pong {
@@ -38,44 +38,37 @@ impl Pong {
             ],
             camera,
             ball: Default::default(),
-            phase: Phase::ReadsController,
+            phase: Phase::MapsPlayfield,
             rand: ThreadRng::default(),
         }
     }
 }
 
 impl EventHandler for Pong {
-    /// Update the game state or transition into a new phase.
+    /// Update the game state or transitions into a new phase.
     fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
-        if let Some(player) = self.ball.player_scored() {
-            println!("Player {} scored.", player);
-
-            self.ball = Default::default();
+        match self.phase {
+            Phase::MapsPlayfield => maps_playfield::update(self),
+            Phase::ReadsController => reads_controllers::update(self),
+            Phase::PlaysPong => plays_pong::update(self),
         }
-
-        // Tries to bounce the ball from a wall if it's close enough.
-        self.ball.bounce_from_wall(&mut self.rand);
-
-        self.ball
-            .bounce_from_paddle(&self.paddles[0], &mut self.rand);
-
-        self.ball
-            .bounce_from_paddle(&self.paddles[1], &mut self.rand);
-
-        // Moves the ball.
-        self.ball.tick();
-
-        Ok(())
     }
 
     /// Redraws the GUI.
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, graphics::WHITE);
 
-        self.ball.draw(ctx, graphics::DrawParam::default())?;
-        self.paddles[0].draw(ctx, graphics::DrawParam::default())?;
-        self.paddles[1].draw(ctx, graphics::DrawParam::default())?;
+        match self.phase {
+            Phase::MapsPlayfield => maps_playfield::draw(self, ctx),
+            Phase::ReadsController => reads_controllers::draw(self, ctx),
+            Phase::PlaysPong => plays_pong::draw(self, ctx),
+        }?;
 
         graphics::present(ctx)
+    }
+
+    fn mouse_motion_event(&mut self, _ctx: &mut Context, x: f32, y: f32, xrel: f32, yrel: f32) {
+        (*self.camera.positions[0].lock().unwrap()) = x;
+        (*self.camera.positions[1].lock().unwrap()) = x;
     }
 }

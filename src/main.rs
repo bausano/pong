@@ -1,10 +1,11 @@
 extern crate ggez;
 extern crate rand;
+extern crate rscam;
 
 mod ball;
 mod camera;
 mod paddle;
-mod phase;
+mod phases;
 mod pong;
 
 use ggez::event;
@@ -12,7 +13,7 @@ use ggez::ContextBuilder;
 use pong::Pong;
 
 /// How large should the game window be in pixels.
-const SCREEN_SIZE: (f32, f32) = (500.0, 500.0);
+const SCREEN_SIZE: (f32, f32) = (500.0, 600.0);
 
 fn main() {
     let (mut ctx, mut events) = ContextBuilder::new("pong", "Michael Bausano")

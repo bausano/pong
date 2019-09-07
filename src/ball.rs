@@ -11,12 +11,12 @@ use rand::Rng;
 pub const INCREMENT_FACTOR: f32 = 1.0 / 500.0;
 pub const DECREMENT_FACTOR: f32 = 1.0 / 500.0;
 pub const RANDOM_BOUNCE_BOUND: f32 = 0.1;
-pub const WALL_ACCELERATION_BONUS: f32 = 1.75;
-pub const PADDLE_ACCELERATION_BONUS: f32 = 2.0;
-pub const MAX_ACCELERATION: f32 = 3.0;
+pub const WALL_ACCELERATION_BONUS: f32 = 1.5;
+pub const PADDLE_ACCELERATION_BONUS: f32 = 1.75;
+pub const MAX_ACCELERATION: f32 = 2.5;
 pub const MIN_ACCELERATION: f32 = -5.0;
-pub const MAX_VELOCITY: f32 = 8.0;
-pub const MIN_VELOCITY: f32 = 4.0;
+pub const MAX_VELOCITY: f32 = 6.5;
+pub const MIN_VELOCITY: f32 = 4.5;
 
 pub struct Ball {
     /// The x and y coordinate of the ball's center.
@@ -66,8 +66,14 @@ impl Default for Ball {
 }
 
 impl Ball {
-    /// TODO: Call bounce from wall method.
-    pub fn tick(&mut self) {
+    /// First checks the balls position. If the ball gets close
+    /// to a wall, it bounces the ball off. Then based on current
+    /// acceleration increases or decreases ball speed.
+    pub fn tick(&mut self, rng: &mut ThreadRng) {
+        self.bounce_from_wall(rng);
+
+        // If the acceleration would slow down the ball, sets the acceleration
+        // bonus to zero and slowly starts decrementing the velocity.
         if self.acceleration < 1.0 {
             self.acceleration = 0.0;
 
@@ -75,6 +81,7 @@ impl Ball {
                 .max(self.velocity * DECREMENT_FACTOR)
                 .min(MAX_VELOCITY);
         } else {
+            // Increments the velocity and decrements the acceleration.
             let increment = self.acceleration * INCREMENT_FACTOR;
             self.acceleration -= increment;
             self.velocity += increment;
@@ -127,6 +134,13 @@ impl Ball {
     }
 
     pub fn bounce_from_paddle(&mut self, paddle: &Paddle, rng: &mut ThreadRng) {
+        if paddle.player_id == 0 && self.direction.1 > 0.0 {
+            return;
+        }
+        if paddle.player_id == 1 && self.direction.1 < 0.0 {
+            return;
+        }
+
         let (left_x, top_y) = paddle.position();
         let right_x = left_x + paddle.width;
         let bottom_y = top_y + paddle.height;
