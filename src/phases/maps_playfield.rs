@@ -37,26 +37,6 @@ pub fn update(state: &mut Pong) -> GameResult<()> {
     Ok(())
 }
 
-/// Draws two red rectangles spanning the whole width of the screen and one sixth of the height.
 pub fn draw(state: &mut Pong, ctx: &mut Context) -> GameResult<()> {
-    graphics::clear(ctx, BLACK);
-
-    let highlight_height = SCREEN_SIZE.1 / 6.0;
-
-    let highlight_top = Rect::new(0.0, 0.0, SCREEN_SIZE.0, highlight_height);
-    let highlight_bottom = Rect::new(
-        0.0,
-        SCREEN_SIZE.1 - highlight_height,
-        SCREEN_SIZE.0,
-        highlight_height,
-    );
-
-    let highlights = MeshBuilder::new()
-        .rectangle(DrawMode::fill(), highlight_top, WHITE)
-        .rectangle(DrawMode::fill(), highlight_bottom, WHITE)
-        .build(ctx)?;
-
-    graphics::draw(ctx, &highlights, DrawParam::default())?;
-
     Ok(())
 }
