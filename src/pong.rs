@@ -1,10 +1,8 @@
 use super::ball::Ball;
 use super::camera::Camera;
 use super::paddle::Paddle;
-use super::phases::{maps_playfield, plays_pong, reads_controllers, Phase};
+use super::phases::Phase;
 use ggez::event::EventHandler;
-use ggez::graphics::Drawable;
-use ggez::nalgebra::Point2;
 use ggez::{graphics, Context, GameResult};
 use rand::rngs::ThreadRng;
 
@@ -38,7 +36,9 @@ impl Pong {
             ],
             camera,
             ball: Default::default(),
-            phase: Phase::MapsPlayfield,
+            // Count downs 3 times one second before taking a picture of the
+            // playfield.
+            phase: Phase::MapsPlayfield { count_down: 3 },
             rand: ThreadRng::default(),
         }
     }
@@ -47,27 +47,18 @@ impl Pong {
 impl EventHandler for Pong {
     /// Update the game state or transitions into a new phase.
     fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
-        match self.phase {
-            Phase::MapsPlayfield => maps_playfield::update(self),
-            Phase::ReadsController => reads_controllers::update(self),
-            Phase::PlaysPong => plays_pong::update(self),
-        }
+        Phase::update(self)
     }
 
     /// Redraws the GUI.
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, graphics::WHITE);
-
-        match self.phase {
-            Phase::MapsPlayfield => maps_playfield::draw(self, ctx),
-            Phase::ReadsController => reads_controllers::draw(self, ctx),
-            Phase::PlaysPong => plays_pong::draw(self, ctx),
-        }?;
-
+        Phase::draw(self, ctx)?;
         graphics::present(ctx)
     }
 
-    fn mouse_motion_event(&mut self, _ctx: &mut Context, x: f32, y: f32, xrel: f32, yrel: f32) {
+    /// The paddles can be also controlled by mouse.
+    fn mouse_motion_event(&mut self, _ctx: &mut Context, x: f32, _y: f32, _xrel: f32, _yrel: f32) {
         (*self.camera.positions[0].lock().unwrap()) = x;
         (*self.camera.positions[1].lock().unwrap()) = x;
     }

@@ -10,8 +10,13 @@ The projector projects the game on a table. There is a camera next to the projec
 
 ## Installation
 
-Install `ggez` dependencies with `sudo apt-get install libasound2 alsa-utils also-oss libasound2-dev libudev-dev`.
+Install `ggez` dependencies with `apt-get install libasound2 alsa-utils alsa-oss libasound2-dev libudev-dev`.
 
+Run `apt-get install libv4l-dev` solve linking error:
+```
+  = note: /usr/bin/ld: cannot find -lv4l2
+          collect2: error: ld returned 1 exit status
+```
 
 ## Content for article
 

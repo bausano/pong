@@ -1,42 +1,27 @@
-use super::super::{Pong, SCREEN_SIZE};
 use super::Phase;
-use ggez::graphics::{self, Color, DrawMode, DrawParam, MeshBuilder, Rect, BLACK, WHITE};
+use crate::pong::Pong;
 use ggez::{Context, GameResult};
+use std::thread;
+use std::time::Duration;
 
 pub fn update(state: &mut Pong) -> GameResult<()> {
-    let mut camera = rscam::new("/dev/video2").unwrap();
-
-    camera
-        .start(&rscam::Config {
-            interval: (1, 30),
-            resolution: (1280, 720),
-            format: b"RGB3",
-            ..Default::default()
-        })
-        .unwrap();
-
-    let mut rows: [u64; 720] = [0; 720];
-    let mut cols: [u64; 1280] = [0; 1280];
-
-    let frame = camera.capture().unwrap();
-
-    for pixel in 0..(&frame.len() / 3) {
-        let value: u64 = frame[(pixel * 3)..(pixel * 3 + 3)]
-            .iter()
-            .fold(0, |acc, x| acc + *x as u64);
-
-        cols[pixel / 720] += value as u64;
-        rows[pixel / 1280] += value as u64;
+    if let Phase::MapsPlayfield { ref mut count_down } = state.phase {
+        if *count_down == 0 {
+            info!("Taking a snapshot of the playfield before the game.");
+            state.camera.map_playfield();
+            state.phase = Phase::PlaysPong;
+        } else {
+            debug!("Will take a snapshot of the field in {}", count_down);
+            thread::sleep(Duration::from_secs(1));
+            *count_down -= 1;
+        }
+    } else {
+        unreachable!("Run logic for mapping a playfield with wrong phase.");
     }
-
-    // println!("cols: ");
-    // cols.iter().for_each(|x| print!("{} ", x / 720));
-    println!("rows: \n");
-    rows.iter().for_each(|x| print!("{} ", x / 1280));
 
     Ok(())
 }
 
-pub fn draw(state: &mut Pong, ctx: &mut Context) -> GameResult<()> {
+pub fn draw(_state: &mut Pong, _ctx: &mut Context) -> GameResult<()> {
     Ok(())
 }

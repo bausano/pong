@@ -211,7 +211,7 @@ impl Drawable for Ball {
     }
 
     /// Creates a bounding box around the ball.
-    fn dimensions(&self, ctx: &mut Context) -> Option<Rect> {
+    fn dimensions(&self, _ctx: &mut Context) -> Option<Rect> {
         Some(Rect::new(
             self.center.0 - self.radius,
             self.center.1 - self.radius,

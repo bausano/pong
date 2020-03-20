@@ -1,4 +1,3 @@
-use super::camera::Camera;
 use super::SCREEN_SIZE;
 use ggez::graphics::{
     draw, BlendMode, Color, DrawMode, DrawParam, Drawable, MeshBuilder, Rect, BLACK,
@@ -68,7 +67,7 @@ impl Drawable for Paddle {
     }
 
     /// Creates a bounding box around the paddle..
-    fn dimensions(&self, ctx: &mut Context) -> Option<Rect> {
+    fn dimensions(&self, _ctx: &mut Context) -> Option<Rect> {
         let (paddle_x, paddle_y) = self.position();
 
         Some(Rect::new(

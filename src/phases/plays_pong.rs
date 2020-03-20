@@ -4,7 +4,7 @@ use ggez::{Context, GameResult};
 
 /// Updates the ball direction, velocity and position.
 pub fn update(state: &mut Pong) -> GameResult<()> {
-    if let Some(player) = state.ball.player_scored() {
+    if state.ball.player_scored().is_some() {
         state.ball = Default::default();
     }
 
