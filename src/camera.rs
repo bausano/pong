@@ -15,13 +15,12 @@ pub struct Camera {
     handle: rscam::Camera,
 
     /// What was the average gray for each column of the top half when the game
-    /// started.
-    /// TODO: Name background.
-    top_half_averages: [u8; 1280],
+    /// started. We refer to this initial state as background.
+    top_half_bg: [u8; 1280],
 
     /// What was the average gray for each column of the bottom half when the
-    /// game started.
-    bottom_half_averages: [u8; 1280],
+    /// game started. We refer to this initial state as background.
+    bottom_half_bg: [u8; 1280],
 }
 
 impl Camera {
@@ -48,8 +47,8 @@ impl Camera {
                 Arc::new(Mutex::new(SCREEN_SIZE.1 as u32 / 2)),
             ],
             handle,
-            top_half_averages: [0; 1280],
-            bottom_half_averages: [0; 1280],
+            top_half_bg: [0; 1280],
+            bottom_half_bg: [0; 1280],
         }
     }
 
@@ -61,11 +60,12 @@ impl Camera {
         // Capture the visible field.
         let frame = self.handle.capture().expect("Cannot capture camera input");
 
-        // Update averages.
+        // Sets the initial state of the playfield which we refer to as the
+        // background. Each half of the image has its own background.
         average_gray_for_frame_halves(
             &frame,
-            &mut self.top_half_averages,
-            &mut self.bottom_half_averages,
+            &mut self.top_half_bg,
+            &mut self.bottom_half_bg,
         );
     }
 
@@ -87,12 +87,9 @@ impl Camera {
 
                 // Finds both controllers in their respective halves and returns
                 // their position on the x axis.
-                let top_x =
-                    find_controller(&self.top_half_averages, &mut top_half);
-                let bottom_x = find_controller(
-                    &self.bottom_half_averages,
-                    &mut bottom_half,
-                );
+                let top_x = find_controller(&self.top_half_bg, &mut top_half);
+                let bottom_x =
+                    find_controller(&self.bottom_half_bg, &mut bottom_half);
 
                 // Updates the controllers.
                 for x in top_x {
@@ -106,6 +103,9 @@ impl Camera {
     }
 }
 
+// From input frame converts all pixels to grayscale. Then it horizontally
+// splits the image into halves. For each half it calculates the average grey at
+// each column.
 fn average_gray_for_frame_halves(
     frame: &[u8],
     top_half_cols_averages: &mut [u8],
@@ -131,6 +131,8 @@ fn average_gray_for_frame_halves(
     calculate_average_column_gray(bottom_half, b);
 }
 
+// Converts RGB pixels to grayscale and then calculates an average for each
+// column.
 fn calculate_average_column_gray(frame: &[u8], averages_store: &mut [u8]) {
     // How many pixels are there in this frame. Each pixel is a chunk of three
     // bytes.
@@ -165,9 +167,14 @@ fn calculate_average_column_gray(frame: &[u8], averages_store: &mut [u8]) {
     }
 }
 
-fn find_controller(averages: &[u8], frame: &mut [u8]) -> Option<u32> {
+// Calculates a diff between the "background", that is the state of the
+// playfield when the game started and there were no objects, which we know from
+// the "maps_playfield" phase, and the current frame. If we find sequence of
+// columns which have increased difference, or distance, to the background, we
+// mark those columns as candidates for having the controller positioned there.
+fn find_controller(background: &[u8], frame: &mut [u8]) -> Option<u32> {
     // Calculates the distance from the background and removes mutability.
-    distance_from_average(averages, frame);
+    distance_from_background(background, frame);
     let frame: &[u8] = frame;
 
     // Calculates the average distance from the average playfield.
@@ -177,41 +184,68 @@ fn find_controller(averages: &[u8], frame: &mut [u8]) -> Option<u32> {
         (total / frame.len()) as u8
     };
 
-    let rate_span = || -> f32 { 0.0 };
+    // Selects a slice from the array of distances from the background.
+    // It sums the squares of those distances.
+    let rate_streak = |from: usize, to: usize| -> f32 {
+        frame[from..to]
+            .iter()
+            .fold(0.0, |sum, el| sum + (*el as f32).powi(2))
+    };
 
-    let mut best_span_rating = 0;
-    let mut best_span: Option<(usize, usize)> = None;
-    let mut current_span_start: Option<usize> = None;
+    // We can default to zero as rating can only be higher.
+    let mut best_streak_rating = 0.0;
+    // We will store a range which contains the most likely horizontal position
+    // of an object which is used to control the paddle.
+    let mut best_streak: Option<(usize, usize)> = None;
+    // If we find a pattern of distances which are higher than average, we make
+    // a note where the increase in distance to the background start.
+    let mut candidate_streak: Option<usize> = None;
 
     for (x, col) in frame.iter().enumerate() {
         let col = *col;
-        if col > average_distance && current_span_start.is_none() {
-            current_span_start = Some(x);
+        // If the current column's distance is larger than average distance it
+        // will start a new streak as a candidate for the best streak.
+        if col > average_distance && candidate_streak.is_none() {
+            candidate_streak = Some(x);
         }
 
-        if col <= average_distance && current_span_start.is_some() {
-            // compare if better
-            best_span = Some((current_span_start.unwrap(), x - 1));
+        // If we found a column which has its average distance lower than
+        // average, the streak stops. Note that this also covers the scenario
+        // where we arrive to the end of the frame while still on streak.
+        if col <= average_distance || x == frame.len() - 1 {
+            // If we are currently on a streak, we want to check whether it's
+            // more distant from the background than other parts.
+            for candidate_start in candidate_streak {
+                // Sums the squares of distances between the frame and the bg.
+                let rating = rate_streak(candidate_start, x - 1);
+                // If this streak was better than previous best, set it as best.
+                if rating > best_streak_rating {
+                    best_streak = Some((candidate_start, x - 1));
+                    best_streak_rating = rating;
+                }
+                // Break the streak.
+                candidate_streak = None;
+            }
         }
     }
 
-    if current_span_start.is_some() {
-        // compare if better
-    }
-
-    best_span
+    // Selects the mid of the streak. That means if the streak is 30 pixels long
+    // and it starts at x = 30, then we return 45.
+    best_streak
         .map(|(from, to)| (to - from) / 2 + from)
         .map(|x| x as u32)
 }
 
-fn distance_from_average(averages: &[u8], frame: &mut [u8]) {
-    debug_assert_eq!(averages.len(), frame.len());
-    for (col, average) in frame.iter_mut().zip(averages) {
+// Changes the value of each column to the value of its distance to the
+// background frame.
+fn distance_from_background(background: &[u8], frame: &mut [u8]) {
+    debug_assert_eq!(background.len(), frame.len());
+    for (col, bg_average) in frame.iter_mut().zip(background) {
         let c = *col;
-        *col = if c > *average {
-            c - average
+        *col = if c > *bg_average {
+            c - bg_average
         } else {
-            average - c
+            bg_average - c
         };
     }
 }
@@ -229,7 +263,7 @@ mod tests {
         000, 000, 00, /**/ 199, 240, 178, /**/ 120, 230, 103, //
         80, 230, 029, /**/ 000, 000, 000, /**/ 209, 009, 084, //
         13, 120, 230, /**/ 103, 080, 230, /**/ 209, 129, 093, //
-        // -------------------------------------------------------------------- //
+        // -------------------------------------------------- //
         100, 100, 100, /**/ 28, 080, 230, /**/ 029, 057, 083, //
         239, 123, 209, /**/ 100, 100, 100, /**/ 240, 178, 20, //
         230, 103, 029, /**/ 057, 083, 028, /**/ 100, 100, 10, //
@@ -249,10 +283,10 @@ mod tests {
     }
 
     #[test]
-    fn test_distance_from_average() {
+    fn test_distance_from_background() {
         let averages = &[120, 80, 30];
         let mut frame = [110, 90, 30];
-        distance_from_average(averages, &mut frame);
+        distance_from_background(averages, &mut frame);
         assert_eq!(&[10, 10, 0], &frame);
     }
 }
