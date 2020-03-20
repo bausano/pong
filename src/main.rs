@@ -18,7 +18,10 @@ fn main() {
     env_logger::init();
     let (mut ctx, mut events) = ContextBuilder::new("pong", "Michael Bausano")
         .window_setup(ggez::conf::WindowSetup::default().title("Pong"))
-        .window_mode(ggez::conf::WindowMode::default().dimensions(SCREEN_SIZE.0, SCREEN_SIZE.1))
+        .window_mode(
+            ggez::conf::WindowMode::default()
+                .dimensions(SCREEN_SIZE.0, SCREEN_SIZE.1),
+        )
         .build()
         .expect("Could not create ggez context.");
 

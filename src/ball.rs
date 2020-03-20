@@ -1,7 +1,8 @@
 use super::paddle::Paddle;
 use super::SCREEN_SIZE;
 use ggez::graphics::{
-    draw, BlendMode, Color, DrawMode, DrawParam, Drawable, MeshBuilder, Rect, BLACK,
+    draw, BlendMode, Color, DrawMode, DrawParam, Drawable, MeshBuilder, Rect,
+    BLACK,
 };
 use ggez::nalgebra::Point2;
 use ggez::{Context, GameResult};
@@ -120,12 +121,12 @@ impl Ball {
     pub fn bounce_from_wall(&mut self, rng: &mut ThreadRng) {
         // If the ball is touching or is beyond the right wall and its direction is to the right as
         // well (positive x value of the direction vector), then the ball should bounce.
-        let bounces_off: bool =
-            self.center.0 + self.radius >= SCREEN_SIZE.0 && self.direction.0 >= 0.0;
+        let bounces_off: bool = self.center.0 + self.radius >= SCREEN_SIZE.0
+            && self.direction.0 >= 0.0;
 
         // Similar check is applied for the left wall.
-        let bounces_off: bool =
-            bounces_off || (self.center.0 - self.radius <= 0.0 && self.direction.0 <= 0.0);
+        let bounces_off: bool = bounces_off
+            || (self.center.0 - self.radius <= 0.0 && self.direction.0 <= 0.0);
 
         if bounces_off {
             // Bounces off a vertical collider - a wall.
@@ -163,14 +164,21 @@ impl Ball {
             return;
         }
 
-        if self.center.0 + self.radius >= left_x && self.center.0 - self.radius <= right_x {
+        if self.center.0 + self.radius >= left_x
+            && self.center.0 - self.radius <= right_x
+        {
             return self.bounce((1.0, -1.0), PADDLE_ACCELERATION_BONUS, rng);
         }
     }
 
     /// Applies transformation to ball's direction vector. The new direction vector is always
     /// in interval <-1; 1> for both x and y.
-    pub fn bounce(&mut self, (x, y): (f32, f32), accelerate: f32, rng: &mut ThreadRng) {
+    pub fn bounce(
+        &mut self,
+        (x, y): (f32, f32),
+        accelerate: f32,
+        rng: &mut ThreadRng,
+    ) {
         // Increases acceleration but keeps it between thresholds. The ball will gain N of its
         // acceleration as velocity every tick.
         self.acceleration = (self.acceleration + accelerate)
@@ -178,7 +186,8 @@ impl Ball {
             .max(MIN_ACCELERATION);
 
         // Small nudge in a random direction.
-        let random_bounce = rng.gen_range(-RANDOM_BOUNCE_BOUND, RANDOM_BOUNCE_BOUND);
+        let random_bounce =
+            rng.gen_range(-RANDOM_BOUNCE_BOUND, RANDOM_BOUNCE_BOUND);
 
         // Applies the transformation vector.
         let new_x = self.direction.0 * x + random_bounce;
@@ -194,7 +203,8 @@ impl Ball {
 
     /// Whether the ball contains given point.
     pub fn contains(&self, x: f32, y: f32) -> bool {
-        (x - self.center.0).powi(2) + (y - self.center.1).powi(2) <= self.radius.powi(2)
+        (x - self.center.0).powi(2) + (y - self.center.1).powi(2)
+            <= self.radius.powi(2)
     }
 }
 

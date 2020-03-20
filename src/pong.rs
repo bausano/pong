@@ -14,8 +14,10 @@ pub struct Pong {
     /// Which phase is the game currently in. This is useful for view switching.
     pub phase: Phase,
 
-    /// Input interface.
-    pub camera: Camera,
+    /// Input interface. We only need the camera during the set up phase, when
+    /// the game starts we can disown camera object to go do work in its own
+    /// thread.
+    pub camera: Option<Camera>,
 
     /// First float represents balls x coordinate, second float balls
     pub ball: Ball,
@@ -34,7 +36,7 @@ impl Pong {
                 Paddle::new(0, camera.positions[0].clone()),
                 Paddle::new(1, camera.positions[1].clone()),
             ],
-            camera,
+            camera: Some(Camera::new()),
             ball: Default::default(),
             // Count downs 3 times one second before taking a picture of the
             // playfield.
@@ -58,8 +60,15 @@ impl EventHandler for Pong {
     }
 
     /// The paddles can be also controlled by mouse.
-    fn mouse_motion_event(&mut self, _ctx: &mut Context, x: f32, _y: f32, _xrel: f32, _yrel: f32) {
-        (*self.camera.positions[0].lock().unwrap()) = x;
-        (*self.camera.positions[1].lock().unwrap()) = x;
+    fn mouse_motion_event(
+        &mut self,
+        _ctx: &mut Context,
+        x: f32,
+        _y: f32,
+        _xrel: f32,
+        _yrel: f32,
+    ) {
+        (*self.paddles[0].x.lock().unwrap()) = x as u32;
+        (*self.paddles[1].x.lock().unwrap()) = x as u32;
     }
 }

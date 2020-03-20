@@ -25,12 +25,12 @@ pub struct Paddle {
     pub color: Color,
 
     /// Pointer to the mutex which updates the paddle's position.
-    x: Arc<Mutex<f32>>,
+    pub x: Arc<Mutex<u32>>,
 }
 
 impl Paddle {
     /// Spawns new player
-    pub fn new(player_id: u8, x: Arc<Mutex<f32>>) -> Self {
+    pub fn new(player_id: u8, x: Arc<Mutex<u32>>) -> Self {
         Paddle {
             x,
             player_id,
@@ -41,10 +41,10 @@ impl Paddle {
         }
     }
 
-    /// Returns position of the top left position of the paddle.
+    /// Returns position of the top left corner of the paddle.
     pub fn position(&self) -> (f32, f32) {
         (
-            ((*self.x.lock().unwrap()) - self.width / 2.0)
+            ((*self.x.lock().unwrap()) as f32 - self.width / 2.0)
                 .min(SCREEN_SIZE.0 - self.width)
                 .max(0.0),
             self.player_id as f32 * (SCREEN_SIZE.1 - self.height),
