@@ -1,5 +1,5 @@
 use super::paddle::Paddle;
-use super::SCREEN_SIZE;
+use super::WINDOW_SIZE;
 use ggez::graphics::{
     draw, BlendMode, Color, DrawMode, DrawParam, Drawable, MeshBuilder, Rect,
     BLACK,
@@ -56,7 +56,7 @@ impl Default for Ball {
     /// Some default values which are going to be changed with the update for ball skins.
     fn default() -> Self {
         Ball {
-            center: (SCREEN_SIZE.0 / 2.0, SCREEN_SIZE.1 / 2.0),
+            center: (WINDOW_SIZE.0 / 2.0, WINDOW_SIZE.1 / 2.0),
             radius: 10.0,
             velocity: 5.0,
             acceleration: 0.0,
@@ -105,7 +105,7 @@ impl Ball {
     /// ```
     ///
     pub fn player_scored(&mut self) -> Option<u8> {
-        if self.center.1 >= SCREEN_SIZE.1 {
+        if self.center.1 >= WINDOW_SIZE.1 {
             return Some(0);
         }
 
@@ -121,7 +121,7 @@ impl Ball {
     pub fn bounce_from_wall(&mut self, rng: &mut ThreadRng) {
         // If the ball is touching or is beyond the right wall and its direction is to the right as
         // well (positive x value of the direction vector), then the ball should bounce.
-        let bounces_off: bool = self.center.0 + self.radius >= SCREEN_SIZE.0
+        let bounces_off: bool = self.center.0 + self.radius >= WINDOW_SIZE.0
             && self.direction.0 >= 0.0;
 
         // Similar check is applied for the left wall.

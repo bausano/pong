@@ -1,12 +1,14 @@
-use super::SCREEN_SIZE;
+use super::WINDOW_SIZE;
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 const CAMERA_DEV: &str = "/dev/video2";
 const FORMAT: &[u8] = b"RGB3";
-const MINIMUM_STREAK_RATING: f32 = 1000.0;
+const MINIMUM_BACKGROUND_DISTANCE: u8 = 10;
+const WINDOW_WIDTH: u32 = WINDOW_SIZE.0 as u32;
 
 /// Object used for scanning the camera input. It updates controller positions.
 pub struct Camera {
@@ -14,16 +16,20 @@ pub struct Camera {
     /// TODO: Consider making these atomic u32s.
     pub positions: [Arc<Mutex<u32>>; 2],
 
-    /// Handle to the started camera which can capture images.
+    // Handle to the started camera which can capture images.
     handle: rscam::Camera,
 
-    /// What was the average gray for each column of the top half when the game
-    /// started. We refer to this initial state as background.
+    // What was the average gray for each column of the top half when the game
+    // started. We refer to this initial state as background.
     top_half_bg: [u8; 1280],
 
-    /// What was the average gray for each column of the bottom half when the
-    /// game started. We refer to this initial state as background.
+    // What was the average gray for each column of the bottom half when the
+    // game started. We refer to this initial state as background.
     bottom_half_bg: [u8; 1280],
+
+    // On average, if we capture only the background, consequential frames will
+    // differ at most by this amount.
+    background_distance_range: u8,
 }
 
 impl Camera {
@@ -58,14 +64,16 @@ impl Camera {
         // Tests the camera.
         handle.capture().expect("Cannot take a capture");
 
+        // Some values will be calibrated later.
         Self {
             positions: [
-                Arc::new(Mutex::new(SCREEN_SIZE.1 as u32 / 2)),
-                Arc::new(Mutex::new(SCREEN_SIZE.1 as u32 / 2)),
+                Arc::new(Mutex::new(WINDOW_WIDTH / 2)),
+                Arc::new(Mutex::new(WINDOW_WIDTH / 2)),
             ],
             handle,
             top_half_bg: [0; 1280],
             bottom_half_bg: [0; 1280],
+            background_distance_range: MINIMUM_BACKGROUND_DISTANCE,
         }
     }
 
@@ -83,6 +91,41 @@ impl Camera {
             &frame,
             &mut self.top_half_bg,
             &mut self.bottom_half_bg,
+        );
+
+        let mut top_half = [0; 1280];
+        let mut bottom_half = [0; 1280];
+        let mut total_distance_over_n_frames = 0usize;
+        const FRAMES_TO_TAKE: usize = 3;
+        for _ in 0..FRAMES_TO_TAKE {
+            let frame =
+                self.handle.capture().expect("Cannot capture camera input");
+            average_gray_for_frame_halves(
+                &frame,
+                &mut top_half,
+                &mut bottom_half,
+            );
+            // Calculates the distance from the background and removes mutability.
+            distance_from_background(&self.top_half_bg, &mut top_half);
+            distance_from_background(&self.bottom_half_bg, &mut bottom_half);
+
+            // Calculates the average distance from the average playfield.
+            let avg_top = average_distance(&top_half) as usize;
+            let avg_bottom = average_distance(&bottom_half) as usize;
+            total_distance_over_n_frames += (avg_top + avg_bottom) / 2;
+            thread::sleep(Duration::from_secs(1));
+        }
+
+        // We took N frames and each frame had two halves, therefore we need to
+        // divide the total by N * 2.
+        let average_distance_over_n_frames =
+            total_distance_over_n_frames / FRAMES_TO_TAKE;
+        self.background_distance_range = (average_distance_over_n_frames as u8)
+            .max(MINIMUM_BACKGROUND_DISTANCE);
+
+        debug!(
+            "The background is in range of {} shades of grey.",
+            self.background_distance_range
         );
     }
 
@@ -105,21 +148,112 @@ impl Camera {
 
                 // Finds both controllers in their respective halves and returns
                 // their position on the x axis.
-                let top_x = find_controller(&self.top_half_bg, &mut top_half);
-                let bottom_x =
-                    find_controller(&self.bottom_half_bg, &mut bottom_half);
+                let top_x =
+                    self.find_controller(&self.top_half_bg, &mut top_half);
+                // let bottom_x =
+                // self.ind_controller(&self.bottom_half_bg, &mut bottom_half);
 
                 // Updates the controllers.
                 for x in top_x {
-                    println!("Updating to {}", x);
+                    println!("Updating controller 1 to {}", x);
                     (*self.positions[0].lock().unwrap()) = x;
                 }
-                for x in bottom_x {
-                    println!("Updating to {}", x);
-                    (*self.positions[1].lock().unwrap()) = x;
-                }
+                // for x in bottom_x {
+                //     println!("Updating controller 2 to {}", x);
+                //     (*self.positions[1].lock().unwrap()) = x;
+                // }
             }
         })
+    }
+    // Calculates a diff between the "background", that is the state of the
+    // playfield when the game started and there were no objects, which we know
+    // from the "maps_playfield" phase, and the current frame. If we find
+    // sequence of columns which have increased difference, or distance, to the
+    // background, we mark those columns as candidates for having the controller
+    // positioned there. Returns controller's position relative to the window,
+    // not to the width of the frame.
+    fn find_controller(
+        &self,
+        background: &[u8],
+        frame: &mut [u8],
+    ) -> Option<u32> {
+        debug_assert_eq!(background.len(), frame.len());
+        // Calculates the distance from the background and removes mutability.
+        distance_from_background(background, frame);
+        let frame: &[u8] = frame;
+
+        // Calculates the average distance from the average playfield.
+        let average_distance = average_distance(frame);
+
+        // If the capture hasn't change all that much, we return early. This
+        // limits the size of the controller. Since the game is meant to be
+        // played using a hand, it shouldn't be an issue.
+        if average_distance < self.background_distance_range {
+            return None;
+        }
+        println!("{}", average_distance);
+
+        // Selects a slice from the array of distances from the background.
+        // It sums the squares of those distances.
+        let rate_streak = |from: usize, to: usize| -> f32 {
+            debug_assert!(to < frame.len());
+            debug_assert!(from <= to);
+            frame[from..to]
+                .iter()
+                .fold(0.0, |sum, el| sum + (*el as f32).powi(2))
+        };
+
+        // We can default to zero as rating can only be higher.
+        let mut best_streak_rating = 0.0;
+        // We will store a range which contains the most likely horizontal
+        // position of an object which is used to control the paddle.
+        let mut best_streak: Option<(usize, usize)> = None;
+        // If we find a pattern of distances which are higher than average, we
+        // make a note where the increase in distance to the background start.
+        let mut candidate_streak: Option<usize> = None;
+
+        for (x, col) in frame.iter().enumerate() {
+            let col = *col;
+            // If the current column's distance is larger than average distance
+            // it will start a new streak as a candidate for the best streak.
+            if col > average_distance && candidate_streak.is_none() {
+                candidate_streak = Some(x);
+                continue;
+            }
+
+            // If we found a column which has its average distance lower than
+            // average, the streak stops. Note that this also covers the
+            // scenario where we arrive to the end of the frame while still on
+            // streak.
+            if col <= average_distance || x == frame.len() - 1 {
+                // If we are currently on a streak, we want to check whether
+                // it's more distant from the background than other parts.
+                for candidate_start in candidate_streak {
+                    // Sums the squares of distances between the frame and the
+                    // background.
+                    let rating = rate_streak(candidate_start, x - 1);
+                    // If this streak was better than previous best, set it as
+                    // best.
+                    if rating > best_streak_rating {
+                        best_streak = Some((candidate_start, x - 1));
+                        best_streak_rating = rating;
+                    }
+                    // Break the streak.
+                    candidate_streak = None;
+                }
+            }
+        }
+
+        // Selects the mid of the streak. That means if the streak is 30 pixels
+        // long and it starts at x = 30, then we return 45.
+        best_streak
+            .map(|(from, to)| (to - from) / 2 + from)
+            // Calculates the position of the controller relative to the window
+            // width. If the camera input is 1280px and the window is 500 px
+            // wide then a controller at 640px of camera input should be
+            // positioned to 250px of window.
+            .map(|x| x * WINDOW_WIDTH as usize / frame.len())
+            .map(|x| x as u32)
     }
 }
 
@@ -187,78 +321,11 @@ fn calculate_average_column_gray(frame: &[u8], averages_store: &mut [u8]) {
     }
 }
 
-// Calculates a diff between the "background", that is the state of the
-// playfield when the game started and there were no objects, which we know from
-// the "maps_playfield" phase, and the current frame. If we find sequence of
-// columns which have increased difference, or distance, to the background, we
-// mark those columns as candidates for having the controller positioned there.
-fn find_controller(background: &[u8], frame: &mut [u8]) -> Option<u32> {
-    debug_assert_eq!(background.len(), frame.len());
-    // Calculates the distance from the background and removes mutability.
-    distance_from_background(background, frame);
-    let frame: &[u8] = frame;
-
-    // Calculates the average distance from the average playfield.
-    let average_distance: u8 = {
-        let total = frame.iter().fold(0usize, |sum, col| sum + *col as usize);
-        // We can be certain that the average won't overflow a byte.
-        (total / frame.len()) as u8
-    };
-
-    // Selects a slice from the array of distances from the background.
-    // It sums the squares of those distances.
-    let rate_streak = |from: usize, to: usize| -> f32 {
-        debug_assert!(to < frame.len());
-        debug_assert!(from <= to);
-        frame[from..to]
-            .iter()
-            .fold(0.0, |sum, el| sum + (*el as f32).powi(2))
-    };
-
-    // We can default to zero as rating can only be higher.
-    let mut best_streak_rating = 0.0;
-    // We will store a range which contains the most likely horizontal position
-    // of an object which is used to control the paddle.
-    let mut best_streak: Option<(usize, usize)> = None;
-    // If we find a pattern of distances which are higher than average, we make
-    // a note where the increase in distance to the background start.
-    let mut candidate_streak: Option<usize> = None;
-
-    for (x, col) in frame.iter().enumerate() {
-        let col = *col;
-        // If the current column's distance is larger than average distance it
-        // will start a new streak as a candidate for the best streak.
-        if col > average_distance && candidate_streak.is_none() {
-            candidate_streak = Some(x);
-            continue;
-        }
-
-        // If we found a column which has its average distance lower than
-        // average, the streak stops. Note that this also covers the scenario
-        // where we arrive to the end of the frame while still on streak.
-        if col <= average_distance || x == frame.len() - 1 {
-            // If we are currently on a streak, we want to check whether it's
-            // more distant from the background than other parts.
-            for candidate_start in candidate_streak {
-                // Sums the squares of distances between the frame and the bg.
-                let rating = rate_streak(candidate_start, x - 1);
-                // If this streak was better than previous best, set it as best.
-                if rating > best_streak_rating {
-                    best_streak = Some((candidate_start, x - 1));
-                    best_streak_rating = rating;
-                }
-                // Break the streak.
-                candidate_streak = None;
-            }
-        }
-    }
-
-    // Selects the mid of the streak. That means if the streak is 30 pixels long
-    // and it starts at x = 30, then we return 45.
-    best_streak
-        .filter(|_| best_streak_rating >= MINIMUM_STREAK_RATING)
-        .map(|(from, to)| (to - from) / 2 + from)
-        .map(|x| x as u32)
+// Calculates the average distance from the background playfield.
+fn average_distance(frame: &[u8]) -> u8 {
+    let total = frame.iter().fold(0usize, |sum, col| sum + *col as usize);
+    // We can be certain that the average won't overflow a byte.
+    (total / frame.len()) as u8
 }
 
 // Changes the value of each column to the value of its distance to the

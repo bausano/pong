@@ -12,15 +12,16 @@ use ggez::ContextBuilder;
 use pong::Pong;
 
 /// How large should the game window be in pixels.
-const SCREEN_SIZE: (f32, f32) = (500.0, 600.0);
+const WINDOW_SIZE: (f32, f32) = (500.0, 600.0);
 
 fn main() {
+    dotenv::dotenv().ok();
     env_logger::init();
     let (mut ctx, mut events) = ContextBuilder::new("pong", "Michael Bausano")
         .window_setup(ggez::conf::WindowSetup::default().title("Pong"))
         .window_mode(
             ggez::conf::WindowMode::default()
-                .dimensions(SCREEN_SIZE.0, SCREEN_SIZE.1),
+                .dimensions(WINDOW_SIZE.0, WINDOW_SIZE.1),
         )
         .build()
         .expect("Could not create ggez context.");

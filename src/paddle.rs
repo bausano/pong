@@ -1,6 +1,7 @@
-use super::SCREEN_SIZE;
+use super::WINDOW_SIZE;
 use ggez::graphics::{
-    draw, BlendMode, Color, DrawMode, DrawParam, Drawable, MeshBuilder, Rect, BLACK,
+    draw, BlendMode, Color, DrawMode, DrawParam, Drawable, MeshBuilder, Rect,
+    BLACK,
 };
 use ggez::{Context, GameResult};
 use std::sync::{Arc, Mutex};
@@ -45,9 +46,9 @@ impl Paddle {
     pub fn position(&self) -> (f32, f32) {
         (
             ((*self.x.lock().unwrap()) as f32 - self.width / 2.0)
-                .min(SCREEN_SIZE.0 - self.width)
+                .min(WINDOW_SIZE.0 - self.width)
                 .max(0.0),
-            self.player_id as f32 * (SCREEN_SIZE.1 - self.height),
+            self.player_id as f32 * (WINDOW_SIZE.1 - self.height),
         )
     }
 }
@@ -57,7 +58,8 @@ impl Drawable for Paddle {
     fn draw(&self, ctx: &mut Context, param: DrawParam) -> GameResult<()> {
         let (paddle_x, paddle_y) = self.position();
 
-        let paddle_shape = Rect::new(paddle_x, paddle_y, self.width, self.height);
+        let paddle_shape =
+            Rect::new(paddle_x, paddle_y, self.width, self.height);
 
         let paddle_mesh = MeshBuilder::new()
             .rectangle(DrawMode::fill(), paddle_shape, self.color)
