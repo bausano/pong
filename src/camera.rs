@@ -1,9 +1,12 @@
 use super::SCREEN_SIZE;
+use std::io;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::thread::JoinHandle;
 
 const CAMERA_DEV: &str = "/dev/video2";
-const RGB: &[u8] = b"RGB3";
+const FORMAT: &[u8] = b"RGB3";
+const MINIMUM_STREAK_RATING: f32 = 1000.0;
 
 /// Object used for scanning the camera input. It updates controller positions.
 pub struct Camera {
@@ -26,15 +29,29 @@ pub struct Camera {
 impl Camera {
     /// Builds a new empty camera that has be to calibrated.
     pub fn new() -> Self {
+        info!(
+            "Starting camera in format {}",
+            String::from_utf8_lossy(&FORMAT)
+        );
         let mut handle =
             rscam::new(CAMERA_DEV).expect("Cannot find camera device");
+
+        for format in handle.formats() {
+            let format = format.expect("Cannot read format");
+            debug!(
+                "{} format is supported: {}.",
+                String::from_utf8_lossy(&format.format),
+                format.description
+            );
+        }
+        assert!(handle.formats().any(|f| f.unwrap().format == FORMAT));
 
         // Starts the camera, now we can capture images.
         handle
             .start(&rscam::Config {
                 interval: (1, 30),
                 resolution: (1280, 720),
-                format: RGB,
+                format: FORMAT,
                 ..Default::default()
             })
             .expect("Cannot start camera");
@@ -71,9 +88,10 @@ impl Camera {
 
     /// Starts a new thread on which the camera continuously screens the
     /// playfield and update the paddle positions.
-    pub fn start_capturing(self) {
+    pub fn start_capturing(self) -> io::Result<JoinHandle<()>> {
         info!("Starting new thread for camera.");
-        thread::spawn(move || {
+        let camera_thread = thread::Builder::new().name("camera".to_string());
+        camera_thread.spawn(move || {
             let mut top_half = [0; 1280];
             let mut bottom_half = [0; 1280];
             loop {
@@ -93,13 +111,15 @@ impl Camera {
 
                 // Updates the controllers.
                 for x in top_x {
+                    println!("Updating to {}", x);
                     (*self.positions[0].lock().unwrap()) = x;
                 }
                 for x in bottom_x {
+                    println!("Updating to {}", x);
                     (*self.positions[1].lock().unwrap()) = x;
                 }
             }
-        });
+        })
     }
 }
 
@@ -173,6 +193,7 @@ fn calculate_average_column_gray(frame: &[u8], averages_store: &mut [u8]) {
 // columns which have increased difference, or distance, to the background, we
 // mark those columns as candidates for having the controller positioned there.
 fn find_controller(background: &[u8], frame: &mut [u8]) -> Option<u32> {
+    debug_assert_eq!(background.len(), frame.len());
     // Calculates the distance from the background and removes mutability.
     distance_from_background(background, frame);
     let frame: &[u8] = frame;
@@ -187,6 +208,8 @@ fn find_controller(background: &[u8], frame: &mut [u8]) -> Option<u32> {
     // Selects a slice from the array of distances from the background.
     // It sums the squares of those distances.
     let rate_streak = |from: usize, to: usize| -> f32 {
+        debug_assert!(to < frame.len());
+        debug_assert!(from <= to);
         frame[from..to]
             .iter()
             .fold(0.0, |sum, el| sum + (*el as f32).powi(2))
@@ -207,6 +230,7 @@ fn find_controller(background: &[u8], frame: &mut [u8]) -> Option<u32> {
         // will start a new streak as a candidate for the best streak.
         if col > average_distance && candidate_streak.is_none() {
             candidate_streak = Some(x);
+            continue;
         }
 
         // If we found a column which has its average distance lower than
@@ -232,6 +256,7 @@ fn find_controller(background: &[u8], frame: &mut [u8]) -> Option<u32> {
     // Selects the mid of the streak. That means if the streak is 30 pixels long
     // and it starts at x = 30, then we return 45.
     best_streak
+        .filter(|_| best_streak_rating >= MINIMUM_STREAK_RATING)
         .map(|(from, to)| (to - from) / 2 + from)
         .map(|x| x as u32)
 }

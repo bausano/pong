@@ -14,7 +14,12 @@ pub fn update(state: &mut Pong) -> GameResult<()> {
                 .expect("The game has not begun yet, the camera object must be present.")
                 .map_playfield();
             state.phase = Phase::PlaysPong;
-            state.camera.take().unwrap().start_capturing();
+            state
+                .camera
+                .take()
+                .unwrap()
+                .start_capturing()
+                .expect("Cannot spawn camera thread");
         } else {
             debug!("Will take a snapshot of the field in {}", count_down);
             *count_down -= 1;

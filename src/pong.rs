@@ -36,7 +36,7 @@ impl Pong {
                 Paddle::new(0, camera.positions[0].clone()),
                 Paddle::new(1, camera.positions[1].clone()),
             ],
-            camera: Some(Camera::new()),
+            camera: Some(camera),
             ball: Default::default(),
             // Count downs 3 times one second before taking a picture of the
             // playfield.
