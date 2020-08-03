@@ -9,14 +9,15 @@ use ggez::{Context, GameResult};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
+pub const RADIUS: f32 = 13.0;
 pub const INCREMENT_FACTOR: f32 = 1.0 / 500.0;
 pub const DECREMENT_FACTOR: f32 = 1.0 / 500.0;
-pub const RANDOM_BOUNCE_BOUND: f32 = 0.1;
-pub const WALL_ACCELERATION_BONUS: f32 = 1.5;
-pub const PADDLE_ACCELERATION_BONUS: f32 = 1.75;
-pub const MAX_ACCELERATION: f32 = 2.5;
+pub const RANDOM_BOUNCE_BOUND: f32 = 0.05;
+pub const WALL_ACCELERATION_BONUS: f32 = 1.4;
+pub const PADDLE_ACCELERATION_BONUS: f32 = 1.9;
+pub const MAX_ACCELERATION: f32 = 2.3;
 pub const MIN_ACCELERATION: f32 = -5.0;
-pub const MAX_VELOCITY: f32 = 6.5;
+pub const MAX_VELOCITY: f32 = 6.0;
 pub const MIN_VELOCITY: f32 = 4.5;
 
 pub struct Ball {
@@ -57,7 +58,7 @@ impl Default for Ball {
     fn default() -> Self {
         Ball {
             center: (WINDOW_SIZE.0 / 2.0, WINDOW_SIZE.1 / 2.0),
-            radius: 10.0,
+            radius: RADIUS,
             velocity: 5.0,
             acceleration: 0.0,
             direction: (1.0, 0.15),

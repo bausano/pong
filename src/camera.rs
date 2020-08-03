@@ -3,7 +3,6 @@ use std::io;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::Duration;
 
 const CAMERA_DEV: &str = "/dev/video2";
 const FORMAT: &[u8] = b"RGB3";
@@ -26,10 +25,6 @@ pub struct Camera {
     // What was the average gray for each column of the bottom half when the
     // game started. We refer to this initial state as background.
     bottom_half_bg: [u8; 1280],
-
-    // On average, if we capture only the background, consequential frames will
-    // differ at most by this amount.
-    background_distance_range: u8,
 }
 
 impl Camera {
@@ -73,7 +68,6 @@ impl Camera {
             handle,
             top_half_bg: [0; 1280],
             bottom_half_bg: [0; 1280],
-            background_distance_range: MINIMUM_BACKGROUND_DISTANCE,
         }
     }
 
@@ -91,41 +85,6 @@ impl Camera {
             &frame,
             &mut self.top_half_bg,
             &mut self.bottom_half_bg,
-        );
-
-        let mut top_half = [0; 1280];
-        let mut bottom_half = [0; 1280];
-        let mut total_distance_over_n_frames = 0usize;
-        const FRAMES_TO_TAKE: usize = 3;
-        for _ in 0..FRAMES_TO_TAKE {
-            let frame =
-                self.handle.capture().expect("Cannot capture camera input");
-            average_gray_for_frame_halves(
-                &frame,
-                &mut top_half,
-                &mut bottom_half,
-            );
-            // Calculates the distance from the background and removes mutability.
-            distance_from_background(&self.top_half_bg, &mut top_half);
-            distance_from_background(&self.bottom_half_bg, &mut bottom_half);
-
-            // Calculates the average distance from the average playfield.
-            let avg_top = average_distance(&top_half) as usize;
-            let avg_bottom = average_distance(&bottom_half) as usize;
-            total_distance_over_n_frames += (avg_top + avg_bottom) / 2;
-            thread::sleep(Duration::from_secs(1));
-        }
-
-        // We took N frames and each frame had two halves, therefore we need to
-        // divide the total by N * 2.
-        let average_distance_over_n_frames =
-            total_distance_over_n_frames / FRAMES_TO_TAKE;
-        self.background_distance_range = (average_distance_over_n_frames as u8)
-            .max(MINIMUM_BACKGROUND_DISTANCE);
-
-        debug!(
-            "The background is in range of {} shades of grey.",
-            self.background_distance_range
         );
     }
 
@@ -156,7 +115,7 @@ impl Camera {
                 // Updates the controllers.
                 for x in top_x {
                     println!("Updating controller 1 to {}", x);
-                    (*self.positions[0].lock().unwrap()) = x;
+                    (*self.positions[1].lock().unwrap()) = x;
                 }
                 // for x in bottom_x {
                 //     println!("Updating controller 2 to {}", x);
@@ -184,11 +143,12 @@ impl Camera {
 
         // Calculates the average distance from the average playfield.
         let average_distance = average_distance(frame);
+        println!("avg distance {:?}", average_distance);
 
         // If the capture hasn't change all that much, we return early. This
         // limits the size of the controller. Since the game is meant to be
         // played using a hand, it shouldn't be an issue.
-        if average_distance < self.background_distance_range {
+        if average_distance < MINIMUM_BACKGROUND_DISTANCE {
             return None;
         }
         println!("{}", average_distance);
@@ -253,7 +213,9 @@ impl Camera {
             // wide then a controller at 640px of camera input should be
             // positioned to 250px of window.
             .map(|x| x * WINDOW_WIDTH as usize / frame.len())
-            .map(|x| x as u32)
+            // To accommodate the fact that camera takes mirror image, we move
+            // the x coordinate to the other side.
+            .map(|x| WINDOW_WIDTH - x as u32)
     }
 }
 

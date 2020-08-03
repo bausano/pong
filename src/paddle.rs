@@ -7,10 +7,10 @@ use ggez::{Context, GameResult};
 use std::sync::{Arc, Mutex};
 
 /// Default paddle size. (width, height)
-pub const PADDLE_SIZE: (f32, f32) = (50.0, 10.0);
+pub const PADDLE_SIZE: (f32, f32) = (100.0, 10.0);
 
 pub struct Paddle {
-    /// Which player controlls the paddle.
+    /// Which player controls the paddle.
     pub player_id: u8,
 
     /// Width of the rectangle representing the paddle.

@@ -68,7 +68,7 @@ impl EventHandler for Pong {
         _xrel: f32,
         _yrel: f32,
     ) {
-        // (*self.paddles[0].x.lock().unwrap()) = x as u32;
-        (*self.paddles[1].x.lock().unwrap()) = x as u32;
+        (*self.paddles[0].x.lock().unwrap()) = x as u32;
+        // (*self.paddles[1].x.lock().unwrap()) = x as u32;
     }
 }

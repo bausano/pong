@@ -12,7 +12,7 @@ use ggez::ContextBuilder;
 use pong::Pong;
 
 /// How large should the game window be in pixels.
-const WINDOW_SIZE: (f32, f32) = (500.0, 600.0);
+const WINDOW_SIZE: (f32, f32) = (1200.0, 700.0);
 
 fn main() {
     dotenv::dotenv().ok();
@@ -27,7 +27,6 @@ fn main() {
         .expect("Could not create ggez context.");
 
     let mut game = Pong::new(&mut ctx);
-
     match event::run(&mut ctx, &mut events, &mut game) {
         Ok(_) => info!("Good game."),
         Err(e) => error!("Error occured: {}", e),
